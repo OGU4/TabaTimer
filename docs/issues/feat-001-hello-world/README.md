@@ -20,7 +20,7 @@ CLAUDE.md の機能追加フローに沿って進める。
 | # | ステップ | 内容 | 成果物 |
 |---|----------|------|--------|
 | 1 | 案件作成 | 案件フォルダ作成、BACKLOG 登録 | 本ファイル(完了) |
-| 2 | 技術調査 | SDK / CLI / シミュレータの仕様確認(公式ドキュメント・npmパッケージの実物)。アプリの最小構成と表示APIの特定 | 調査結果(requirements.md / design.md の材料) |
+| 2 | 技術調査 | SDK / CLI / シミュレータの仕様確認(公式ドキュメント・npmパッケージの実物)。アプリの最小構成と表示APIの特定 | research.md(完了) |
 | 3 | 要求仕様書作成 | Hello World の機能要求・受け入れ基準を `REQUIREMENTS_STANDARD.md` 準拠で記述 | requirements.md |
 | 4 | 機能設計書作成 | プロジェクト構成、使用パッケージとバージョン、表示処理、起動手順を `DESIGN_STANDARD.md` 準拠で記述 | design.md |
 | 5 | レビュー | Codex + 人レビュー。重要度「高」「中」の指摘がゼロになるまで修正 | レビュー済みドキュメント |
@@ -44,10 +44,12 @@ npm レジストリで確認済みの公式パッケージ:
 - 開発は Web 技術(HTML/CSS/JS/TS)。Vite + SDK の構成が公式ドキュメントの例
 - 開発フロー: コード作成 → evenhub-simulator でローカル確認 → QR で実機サイドロード → `evenhub pack` → Even Hub 提出(公開時)
 
-## 未確定事項(ステップ2で調査すること)
+## 未確定事項
 
-- シミュレータの起動方法・操作方法(`evenhub-simulator` パッケージの実物を導入して確認)
-- プロジェクトの推奨構成(公式テンプレート・スキャフォールドの有無。`evenhub init` が生成するのは app.json のみか)
-- SDK の表示 API(テキストをグラス画面に出す具体的な方法)
-- 表示解像度の正確な仕様(コミュニティ情報ではグラス側 576x288px、イメージ上限 288x144 — 公式情報での裏取りが必要)
-- 公式ドキュメントの installation / first-app / simulator ページの内容(JSレンダリングのため WebFetch では取得不可。SDK パッケージ内の README やシミュレータ導入後の実物で確認する)
+**すべて解決済み(2026-06-12、詳細は [research.md](research.md))**:
+
+- シミュレータの起動方法 → `evenhub-simulator <targetUrl> --automation-port <PORT>`。targetUrl は必須。このPCで GUI 起動を実証済み
+- プロジェクト構成 → 公式スキャフォールドは無し。Vite + SDK が公式例(`evenhub init` は app.json 生成のみで feat-001 ではスコープ外)
+- SDK の表示 API → `waitForEvenAppBridge()` → `createStartUpPageContainer()` にテキストコンテナを渡す(コンテナモデルの制約は research.md 参照)
+- 表示解像度 → グラスキャンバス 576×288 で確定(スクリーンショット実寸でも確認)。イメージ上限 288×144
+- 公式ドキュメントの不足分 → パッケージ実物の README(SDK / シミュレータ / CLI)で代替確認完了
