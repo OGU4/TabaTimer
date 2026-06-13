@@ -1,0 +1,20 @@
+{
+  "name": "tabatimer-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "sim": "evenhub-simulator http://127.0.0.1:5173",
+    "sim:auto": "evenhub-simulator http://127.0.0.1:5173 --automation-port 9898",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "0.0.10"
+  },
+  "devDependencies": {
+    "@evenrealities/evenhub-simulator": "0.7.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
+  }
+}
