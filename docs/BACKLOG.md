@@ -12,4 +12,4 @@
 
 | ID | 案件名 | 種別 | ステータス | 作成日 | 完了日 |
 |----|--------|------|-----------|--------|--------|
-| feat-001 | シミュレーターで Hello World([案件フォルダ](issues/feat-001-hello-world/)) | feat | In Progress | 2026-06-12 | - |
+| feat-001 | シミュレーターで Hello World([案件フォルダ](issues/feat-001-hello-world/)) | feat | Closed | 2026-06-12 | 2026-06-13 |
