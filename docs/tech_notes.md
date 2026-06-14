@@ -6,7 +6,7 @@
 - **更新方針**: 案件(feat 系 / bug 系)の**完了処理時**(機能追加フロー・不具合修正フローのステップ8)に、その案件で得た再利用価値の高い知見を `research.md`・`investigation.md`・実装から抽出して追記する。出典(案件・公式資料)を明記する。再利用価値のある知見がなければ追記不要
 - **位置づけ**: 各案件の `docs/issues/{案件}/research.md` が一次調査記録、本ファイルが横断サマリ
 
-最終更新: 2026-06-14(feat-002 完了時点)
+最終更新: 2026-06-14(feat-003 完了時点)
 
 ---
 
@@ -112,8 +112,31 @@ const id = setInterval(() => render(formatNow()), 1000);
 - 購読は `bridge.onEvenHubEvent(handler)`。返り値 `unsubscribe()` で解除
 - **イベント経路は2系統**: タップ/ダブルタップ/ライフサイクルは `event.sysEvent`、スクロール(SCROLL_TOP/BOTTOM)は `event.textEvent`。両ブランチを別々に判定する
 - **Protobuf はゼロ値フィールドを省略する**。`CLICK_EVENT`(値0)はワイヤ上 `undefined` で届くため、比較前に `?? null`(または `?? 0`)で coalesce する(誤判定防止)
-- **ダブルタップ → `shutDownPageContainer(exitMode)` でアプリ終了**が公式テンプレートの慣習。`exitMode` は 0=即終了 / 1=前面レイヤをポップしユーザー操作待ち(テンプレートは 1)
+- **ダブルタップ → `shutDownPageContainer(exitMode)` でアプリ終了**。`exitMode` は **0=即終了・キャンセル不可** / **1=前面レイヤをポップしユーザー操作待ち(キャンセル可能)**。公式テンプレートは 1 だが、**後始末(cleanup)を終了前に先行実行する設計なら exitMode=0 が整合的**。1 だとユーザーがキャンセルした場合に「画面は残るがループ・購読は解除済み」の復帰不能状態になり得る。TabaTimer は feat-003 で **0(即終了)** を採用(出典: feat-003 design.md ADR / Codex レビュー指摘)
 - ライフサイクル `SYSTEM_EXIT_EVENT`(7)/ `ABNORMAL_EXIT_EVENT`(6)を受けたら後始末(ループ停止・`unsubscribe()`)。`window.addEventListener('beforeunload', cleanup)` も併用
+- **前面/背面遷移**: `FOREGROUND_ENTER_EVENT`(4)/ `FOREGROUND_EXIT_EVENT`(5)で取得。TabaTimer は背面化でも更新ループを止めない方針(実機での省電力/BLE 帯域最適化は実機到着後に再検討)。シミュレータは前面固定でこの遷移を発火しないため自動検証不可
+
+### 後始末(cleanup)の完全性パターン(feat-003 で確立)
+
+冪等な `cleanup()` は、登録したものを**漏れなく**解放する。1つでも漏れるとリーク・多重ループ・多重リスナーの原因になる。解放対象:
+
+1. `clearInterval`(更新ループ)
+2. `onEvenHubEvent` の `unsubscribe()`
+3. `onLaunchSource` の `unsubscribe()`(下記 5.1)
+4. `window.removeEventListener('beforeunload', cleanup)` ← **登録と同一の関数参照で解除**(無名ラッパで包むと解除できない)
+
+各解放は個別に null/未設定チェックしてから行い、**部分初期化済み状態(起動失敗時など一部だけ登録済み)でも安全に呼べる**ようにする。`cleanedUp` フラグで2回目以降は即 return(冪等)。**起動失敗の早期 return でも `cleanup()` を呼ぶ**(例: `createStartUpPageContainer` が 0 以外を返したら、登録済みの `onLaunchSource` を解除するため cleanup してから return)。
+
+### 5.1 起動元の判別 `onLaunchSource`(feat-003 で確立)
+
+- `bridge.onLaunchSource((source) => ...)` がロード完了時に**1回だけ** push。`source` は `'appMenu'`(スマホ Even App メニュー)/ `'glassesMenu'`(グラスメニュー)。戻り値は `unsubscribe` 関数
+- **`onEvenHubEvent` とは別系統**。launch source は `onEvenHubEvent` には含まれない
+- push は1回限りのため**ブリッジ取得直後・`createStartUpPageContainer` より前に早期登録**する(取りこぼし防止)
+- **非ブロッキングにする**: 購読登録のみで、launch source の到着を待たずに画面生成へ進む。通知が来ない環境でも起動が成立する設計にする
+- 「グラスから開いた時だけ反応する」UI は `source === 'glassesMenu'` でフィルタできる(現 TabaTimer は分岐せずログ出力のみ)
+- **シミュレータ(0.7.3)は launch source を push しない**(feat-003 で確認)。よって起動元ログは実機初検証項目。push 有無に関わらず初期画面生成は正常動作する
+
+出典: feat-003 research.md / design.md・SDK 0.0.10 README(L84-118, L663-683)・実装(`app/src/main.ts`)
 
 ### `OsEventTypeList`(SDK 0.0.10 実値)
 

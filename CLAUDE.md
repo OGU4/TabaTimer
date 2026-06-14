@@ -229,3 +229,4 @@ codex exec resume --last "ドキュメントを更新したので再レビュー
 -->
 - **feat-001**: シミュレーターで Hello World(2026-06-13完了)。Vite + TypeScript + 公式SDK で `app/` を構築し、evenhub-simulator のグラス画面に「Hello World」を表示。開発・自動検証(automation API)の土台を確立した
 - **feat-002**: デジタル時計風表示(2026-06-14完了)。`app/src/main.ts` で `HH:MM:SS`(24時間制)を `textContainerUpgrade` により毎秒更新し、ダブルタップで終了。「同位置の継続更新」をインターバルタイマーの中核技術として実証した
+- **feat-003**: アプリの起動・終了処理の仕様化(2026-06-14完了)。起動(ブリッジ取得 → `onLaunchSource` 起動元判別 → 初期画面生成)と終了(ダブルタップ `shutDownPageContainer(0)` 即終了 / ライフサイクル終了イベント / `beforeunload`)のライフサイクル骨格を要求仕様書・機能設計書として確定。`onLaunchSource`(新規)・冪等な後始末(全購読解除・リスナー解除)を実装し、タイマー本体を載せる土台を整えた

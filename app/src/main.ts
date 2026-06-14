@@ -5,13 +5,16 @@ import {
   TextContainerUpgrade,
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk';
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk';
+import type {
+  EvenAppBridge,
+  EvenHubEvent,
+} from '@evenrealities/even_hub_sdk';
 
 const BRIDGE_TIMEOUT_MS = 8000; // feat-001 から継続
 const UPDATE_INTERVAL_MS = 1000; // 更新ループ間隔
 const CONTAINER_ID = 1; // 時刻表示コンテナのID
 const CONTAINER_NAME = 'clock'; // 最大16文字
-const SHUTDOWN_EXIT_MODE = 1; // 1=前面レイヤをポップしユーザー操作待ち(公式テンプレート慣習)
+const SHUTDOWN_EXIT_MODE = 0; // 0=即終了・キャンセル不可(feat-003 で 1 から変更。design.md 4.4 ADR 参照)
 // コンテナのレイアウト(中央寄せ)。feat-001 の Hello World と同系の配置
 const CLOCK_X = 138;
 const CLOCK_Y = 104;
@@ -27,6 +30,7 @@ const CONTAINER_RESULT_MEANING: Record<number, string> = {
 let bridge: EvenAppBridge;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let unsubscribe: (() => void) | null = null;
+let unsubscribeLaunch: (() => void) | null = null; // onLaunchSource の購読解除関数(feat-003)
 let cleanedUp = false;
 // 直列化で前回更新の完了を待ってから次を投げる
 let rendering: Promise<unknown> = Promise.resolve();
@@ -80,32 +84,84 @@ function stopClockLoop(): void {
   }
 }
 
-// ループ停止 + 購読解除(冪等)
+// ループ停止 + 全購読解除 + リスナー解除(冪等)。部分初期化済み状態でも安全
 function cleanup(): void {
   if (cleanedUp) {
     return;
   }
   cleanedUp = true;
-  stopClockLoop();
+  stopClockLoop(); // intervalId が null でも安全
   if (unsubscribe !== null) {
     unsubscribe();
     unsubscribe = null;
   }
-  console.log('[clock] cleanup done');
+  if (unsubscribeLaunch !== null) {
+    unsubscribeLaunch();
+    unsubscribeLaunch = null;
+  }
+  // 登録時と同一の cleanup 参照で解除し、リスナーの多重登録を残さない
+  window.removeEventListener('beforeunload', cleanup);
+  console.log('[lifecycle] cleanup done');
+}
+
+// onLaunchSource を登録し起動元をログ出力する(画面分岐はしない)
+function registerLaunchSource(): void {
+  unsubscribeLaunch = bridge.onLaunchSource((source) => {
+    // 起動元による分岐はしない。記録のみ(将来の分岐・実機デバッグ用)
+    console.log(`[lifecycle] launch source: ${source}`);
+  });
+}
+
+// EvenHub イベントを振り分ける(終了 / ライフサイクル終了 / 前面背面)
+function handleEvenHubEvent(event: EvenHubEvent): void {
+  // Protobuf はゼロ値を省くため ?? null で coalesce(誤判定防止)
+  const sysType = event.sysEvent?.eventType ?? null;
+  const textType = event.textEvent?.eventType ?? null;
+
+  // ダブルタップ → 終了(どちらの envelope でも受ける)
+  if (
+    sysType === OsEventTypeList.DOUBLE_CLICK_EVENT ||
+    textType === OsEventTypeList.DOUBLE_CLICK_EVENT
+  ) {
+    cleanup();
+    bridge.shutDownPageContainer(SHUTDOWN_EXIT_MODE); // 0=即終了・キャンセル不可
+    return;
+  }
+
+  // ライフサイクル終了 → 後始末
+  if (
+    sysType === OsEventTypeList.SYSTEM_EXIT_EVENT ||
+    sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT
+  ) {
+    cleanup();
+    return;
+  }
+
+  // 前面/背面遷移 → ループは止めない(更新継続)。ログのみ
+  if (
+    sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT ||
+    sysType === OsEventTypeList.FOREGROUND_EXIT_EVENT
+  ) {
+    console.log(`[lifecycle] foreground event: ${sysType}`);
+    return;
+  }
 }
 
 async function main(): Promise<void> {
-  console.log('[clock] page loaded');
+  console.log('[lifecycle] page loaded');
 
   try {
     bridge = await waitForBridgeWithTimeout(BRIDGE_TIMEOUT_MS);
   } catch (err) {
     console.error(
-      `[clock] ${(err as Error).message} — open this page via evenhub-simulator, not a normal browser`,
+      `[lifecycle] ${(err as Error).message} — open this page via evenhub-simulator, not a normal browser`,
     );
     return;
   }
-  console.log('[clock] bridge acquired');
+  console.log('[lifecycle] bridge acquired');
+
+  // 起動元の通知は「ロード完了後1回限り」のため、画面生成より前に早期登録する
+  registerLaunchSource();
 
   const initialContent = formatClock(new Date());
   const result = await bridge.createStartUpPageContainer(
@@ -128,42 +184,22 @@ async function main(): Promise<void> {
 
   if (result !== 0) {
     const meaning = CONTAINER_RESULT_MEANING[result] ?? 'Unknown';
-    console.error(`[clock] createStartUpPageContainer failed: result=${result} (${meaning})`);
+    console.error(`[lifecycle] createStartUpPageContainer failed: result=${result} (${meaning})`);
+    // 登録済みの onLaunchSource 購読をリークさせないため後始末してから中止する
+    cleanup();
     return;
   }
-  console.log(`[clock] displayed: ${initialContent}`);
+  console.log(`[lifecycle] displayed: ${initialContent}`);
 
   // 初期表示済みのため即時 renderTime はせず、次の1秒後の発火に任せる
   startClockLoop();
 
-  unsubscribe = bridge.onEvenHubEvent((event) => {
-    // Protobuf はゼロ値を省くため ?? null で coalesce する
-    const sysType = event.sysEvent?.eventType ?? null;
-    const textType = event.textEvent?.eventType ?? null;
-
-    // ダブルタップ → 終了(どちらの envelope でも受ける)
-    if (
-      sysType === OsEventTypeList.DOUBLE_CLICK_EVENT ||
-      textType === OsEventTypeList.DOUBLE_CLICK_EVENT
-    ) {
-      cleanup();
-      bridge.shutDownPageContainer(SHUTDOWN_EXIT_MODE);
-      return;
-    }
-
-    // ライフサイクル終了 → 後始末
-    if (
-      sysType === OsEventTypeList.SYSTEM_EXIT_EVENT ||
-      sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT
-    ) {
-      cleanup();
-    }
-  });
+  unsubscribe = bridge.onEvenHubEvent(handleEvenHubEvent);
 
   // ページ破棄時の後始末を保証する
   window.addEventListener('beforeunload', cleanup);
 }
 
 main().catch((err) => {
-  console.error('[clock] unhandled error:', err);
+  console.error('[lifecycle] unhandled error:', err);
 });

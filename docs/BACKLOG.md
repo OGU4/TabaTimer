@@ -14,3 +14,4 @@
 |----|--------|------|-----------|--------|--------|
 | feat-001 | シミュレーターで Hello World([案件フォルダ](issues/feat-001-hello-world/)) | feat | Closed | 2026-06-12 | 2026-06-13 |
 | feat-002 | デジタル時計風表示([案件フォルダ](issues/feat-002-digital-clock/)) | feat | Closed | 2026-06-14 | 2026-06-14 |
+| feat-003 | アプリの起動・終了処理の仕様化([案件フォルダ](issues/feat-003-app-lifecycle/)) | feat | Closed | 2026-06-14 | 2026-06-14 |
