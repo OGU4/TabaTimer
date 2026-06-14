@@ -13,4 +13,4 @@
 | ID | 案件名 | 種別 | ステータス | 作成日 | 完了日 |
 |----|--------|------|-----------|--------|--------|
 | feat-001 | シミュレーターで Hello World([案件フォルダ](issues/feat-001-hello-world/)) | feat | Closed | 2026-06-12 | 2026-06-13 |
-| feat-002 | デジタル時計風表示([案件フォルダ](issues/feat-002-digital-clock/)) | feat | In Progress | 2026-06-14 | - |
+| feat-002 | デジタル時計風表示([案件フォルダ](issues/feat-002-digital-clock/)) | feat | Closed | 2026-06-14 | 2026-06-14 |
